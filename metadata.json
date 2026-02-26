@@ -1,0 +1,8 @@
+{
+  "name": "团队管理智能体系统",
+  "description": "An AI-powered target and plan management system that analyzes execution behavior, risk signals, and organizational experience to ensure goal achievement.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
