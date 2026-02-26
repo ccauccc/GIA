@@ -367,3 +367,31 @@ export const MOCK_EXPERIENCES = [
     solution: '引入地址大模型与时空知识图谱。'
   }
 ];
+
+export const MOCK_PRD_VERSIONS = [
+  {
+    id: 'v1.5',
+    version: 'V1.5',
+    releaseDate: '2026-02-26',
+    title: 'GIA 研发基准版 - 自动化总结与导出重构',
+    overview: '本次版本重点优化了支撑项目的自动化总结逻辑，并重构了导出系统的交互体验。',
+    changes: [
+      { id: 'c1', module: '支撑项目', type: '重构', description: '实现基于 Timeline 的自动化总结截取算法。' },
+      { id: 'c2', module: '导出系统', type: '优化', description: '增加固定表头表尾，支持 90vh 高度自适应。' },
+      { id: 'c3', module: '系统管理', type: '新增', description: '增加 PRD 导出 Word 功能。' }
+    ],
+    fullContent: '<h1>GIA V1.5 PRD</h1><p>详细内容已在系统维护模块中定义...</p>'
+  },
+  {
+    id: 'v1.4',
+    version: 'V1.4',
+    releaseDate: '2026-02-10',
+    title: 'GIA 核心看板增强版',
+    overview: '增加了 AI 达成预测模型及目标地图可视化功能。',
+    changes: [
+      { id: 'c4', module: '目标全景', type: '新增', description: '引入 AI 达成预测加权算法。' },
+      { id: 'c5', module: '目标地图', type: '新增', description: '支持 OKR 层级拓扑展示。' }
+    ],
+    fullContent: '<h1>GIA V1.4 PRD</h1><p>历史版本内容...</p>'
+  }
+];

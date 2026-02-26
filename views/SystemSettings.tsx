@@ -3,10 +3,13 @@ import React, { useState } from 'react';
 import { 
   Settings, Plus, Trash2, ShieldCheck, Database, Zap, 
   Layers, Book, Building2, Server, ChevronRight, Workflow, Package,
-  Cpu, BarChart3, Coins, Activity, X, Users
+  Cpu, BarChart3, Coins, Activity, X, Users, FileText, Download, AlertTriangle
 } from 'lucide-react';
-import { GoalCategory, Team } from '../types';
+import { GoalCategory, Team, PRDVersion, PRDChange } from '../types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { MOCK_PRD_VERSIONS } from '../constants';
+import { FULL_SYSTEM_PRD_HTML } from '../prdConstants';
+import { History, FileEdit, PlusCircle, CheckCircle } from 'lucide-react';
 
 interface SystemSettingsProps {
   buOptions: string[];
@@ -23,7 +26,163 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
   buOptions, setBuOptions, stageOptions, setStageOptions, productLineOptions, setProductLineOptions,
   teams, setTeams
 }) => {
-  const [activeConfigTab, setActiveConfigTab] = useState<'dictionary' | 'ai' | 'model' | 'team'>('dictionary');
+  const [activeConfigTab, setActiveConfigTab] = useState<'dictionary' | 'ai' | 'model' | 'team' | 'system'>('dictionary');
+  
+  // PRD Management State
+  const [prdVersions, setPrdVersions] = useState<PRDVersion[]>(MOCK_PRD_VERSIONS);
+  const [selectedPrdVersion, setSelectedPrdVersion] = useState<PRDVersion | null>(null);
+  const [isEditingPrd, setIsEditingPrd] = useState(false);
+
+  const handleExportPRD = (versionObj?: PRDVersion) => {
+    const v = versionObj || prdVersions[0];
+    const prdContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>GIA PRD ${v.version}</title>
+      <style>
+        body { font-family: 'SimSun', serif; line-height: 1.6; color: #334155; }
+        h1 { text-align: center; color: #0f172a; font-size: 24pt; margin-bottom: 20px; }
+        h2 { border-bottom: 2px solid #6366f1; padding-bottom: 5px; color: #4338ca; margin-top: 40px; font-size: 18pt; }
+        h3 { color: #1e293b; margin-top: 25px; font-size: 14pt; border-left: 4px solid #6366f1; padding-left: 10px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 10pt; }
+        th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+        th { background-color: #f8fafc; font-weight: bold; color: #1e293b; }
+        .meta { color: #64748b; font-size: 10pt; text-align: right; margin-bottom: 40px; }
+        .change-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 8px; }
+        .tag-new { background: #ecfdf5; color: #059669; }
+        .tag-opt { background: #eff6ff; color: #2563eb; }
+        .tag-fix { background: #fef2f2; color: #dc2626; }
+      </style>
+      </head>
+      <body>
+        <h1>GIA (Goal Intelligence Agent) 产品需求文档 (PRD)</h1>
+        <p class="meta">版本：${v.version} | 标题：${v.title} | 日期：${v.releaseDate}</p>
+        
+        <h2>1. 版本概述</h2>
+        <p>${v.overview}</p>
+
+        <h2>2. 变更记录</h2>
+        <table>
+          <tr><th>模块</th><th>类型</th><th>变更描述</th></tr>
+          ${v.changes.map(c => `
+            <tr>
+              <td>${c.module}</td>
+              <td>${c.type}</td>
+              <td>${c.description}</td>
+            </tr>
+          `).join('')}
+        </table>
+
+        <h2>3. 系统完整功能说明 (研发级)</h2>
+        ${FULL_SYSTEM_PRD_HTML}
+        
+        <h2>4. 本版本详细功能补充</h2>
+        ${v.fullContent}
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([prdContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `GIA_PRD_${v.version}_${v.releaseDate}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportFullPRD = () => {
+    const prdContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>GIA 全量版本 PRD</title>
+      <style>
+        body { font-family: 'SimSun', serif; line-height: 1.6; color: #334155; }
+        h1 { text-align: center; color: #0f172a; font-size: 24pt; margin-bottom: 20px; }
+        h2 { border-bottom: 2px solid #6366f1; padding-bottom: 5px; color: #4338ca; margin-top: 40px; font-size: 18pt; }
+        h3 { color: #1e293b; margin-top: 25px; font-size: 14pt; border-left: 4px solid #6366f1; padding-left: 10px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 10pt; }
+        th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
+        th { background-color: #f8fafc; font-weight: bold; color: #1e293b; }
+        .meta { color: #64748b; font-size: 10pt; text-align: right; margin-bottom: 40px; }
+        .version-section { margin-top: 60px; border-top: 4px double #cbd5e1; padding-top: 40px; }
+      </style>
+      </head>
+      <body>
+        <h1>GIA (Goal Intelligence Agent) 全量版本需求文档 (PRD)</h1>
+        <p class="meta">导出日期：${new Date().toISOString().split('T')[0]}</p>
+        
+        ${prdVersions.map((v, idx) => `
+          <div class="version-section">
+            <h2 style="color: #6366f1;">第 ${prdVersions.length - idx} 部分：${v.version} - ${v.title}</h2>
+            <p class="meta">发布日期：${v.releaseDate}</p>
+            
+            <h3>1. 版本概述</h3>
+            <p>${v.overview}</p>
+
+            <h3>2. 变更记录</h3>
+            <table>
+              <tr><th>模块</th><th>类型</th><th>变更描述</th></tr>
+              ${v.changes.map(c => `
+                <tr>
+                  <td>${c.module}</td>
+                  <td>${c.type}</td>
+                  <td>${c.description}</td>
+                </tr>
+              `).join('')}
+            </table>
+
+            <h3>3. 详细功能说明</h3>
+            ${v.fullContent}
+          </div>
+        `).join('')}
+
+        <div class="version-section">
+          <h2 style="color: #4338ca;">附录：GIA 系统完整功能架构说明 (研发级)</h2>
+          ${FULL_SYSTEM_PRD_HTML}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([prdContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `GIA_Full_PRD_${new Date().toISOString().split('T')[0]}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleAutomatePrdUpdate = () => {
+    // Simulate automated PRD generation based on "system changes"
+    const nextVersion = `V1.${prdVersions.length + 5}`;
+    const newVersion: PRDVersion = {
+      id: `v${nextVersion.toLowerCase()}`,
+      version: nextVersion,
+      releaseDate: new Date().toISOString().split('T')[0],
+      title: `GIA ${nextVersion} 自动化生成版本`,
+      overview: '系统检测到多项功能变更，已自动汇总至此版本。',
+      changes: [
+        { id: `c-${Date.now()}-1`, module: '系统管理', type: '新增', description: 'PRD 自动化书写与版本管理功能重构。' },
+        { id: `c-${Date.now()}-2`, module: '支撑看板', type: '优化', description: '增强了 Timeline 数据的自动化截取精度。' }
+      ],
+      fullContent: '<h3>功能重构说明</h3><p>本次版本重点解决了 PRD 手动维护成本高的问题，通过版本化管理实现变更可追溯。</p>',
+      isDraft: true
+    };
+    setPrdVersions([newVersion, ...prdVersions]);
+    setSelectedPrdVersion(newVersion);
+    setIsEditingPrd(true);
+  };
+
+  const savePrdEdit = () => {
+    if (selectedPrdVersion) {
+      setPrdVersions(prdVersions.map(v => v.id === selectedPrdVersion.id ? { ...selectedPrdVersion, isDraft: false } : v));
+      setIsEditingPrd(false);
+    }
+  };
   
   // Model Management State
   const [availableModels, setAvailableModels] = useState([
@@ -200,6 +359,20 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
               <Users size={18} /> 小组与组长管理
             </div>
             {activeConfigTab === 'team' && <ChevronRight size={16} className="text-indigo-400" />}
+          </button>
+
+          <button 
+            onClick={() => setActiveConfigTab('system')}
+            className={`w-full flex items-center justify-between p-4 rounded-2xl text-sm font-bold transition-all ${
+              activeConfigTab === 'system' 
+                ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
+                : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Server size={18} /> 系统维护
+            </div>
+            {activeConfigTab === 'system' && <ChevronRight size={16} className="text-indigo-400" />}
           </button>
         </div>
       </div>
@@ -870,6 +1043,244 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+        {activeConfigTab === 'system' && (
+          <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 pb-20">
+             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-50">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                      <Workflow size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900">PRD 自动化书写与版本管理</h3>
+                      <p className="text-xs text-slate-400 font-bold mt-1">基于系统变更自动生成需求文档，支持版本追溯与人工修正。</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={handleExportFullPRD}
+                      className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all flex items-center gap-2"
+                    >
+                      <Download size={18} /> 导出全量版本 PRD
+                    </button>
+                    <button 
+                      onClick={handleAutomatePrdUpdate}
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
+                    >
+                      <Zap size={18} /> 自动化生成新版本
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                  {/* Version List */}
+                  <div className="xl:col-span-1 space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <History size={16} className="text-slate-400" />
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">历史发布版本</span>
+                    </div>
+                    {prdVersions.map(v => (
+                      <button 
+                        key={v.id}
+                        onClick={() => {
+                          setSelectedPrdVersion(v);
+                          setIsEditingPrd(false);
+                        }}
+                        className={`w-full text-left p-4 rounded-2xl border transition-all ${
+                          selectedPrdVersion?.id === v.id 
+                            ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
+                            : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-sm font-black text-slate-900">{v.version}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{v.releaseDate}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium truncate">{v.title}</p>
+                        {v.isDraft && (
+                          <span className="mt-2 inline-block px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded uppercase tracking-widest">草稿 / 待修正</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Version Detail / Edit */}
+                  <div className="xl:col-span-2">
+                    {selectedPrdVersion ? (
+                      <div className="bg-slate-50/50 rounded-[2rem] border border-slate-100 p-8 space-y-8">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
+                              <FileText size={24} />
+                            </div>
+                            <div>
+                              <h4 className="text-lg font-black text-slate-900">{selectedPrdVersion.version} - {selectedPrdVersion.title}</h4>
+                              <p className="text-xs text-slate-400 font-bold">发布日期: {selectedPrdVersion.releaseDate}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {!isEditingPrd ? (
+                              <>
+                                <button 
+                                  onClick={() => setIsEditingPrd(true)}
+                                  className="p-3 bg-white text-slate-600 rounded-xl border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm"
+                                  title="人工修正变更"
+                                >
+                                  <FileEdit size={18} />
+                                </button>
+                                <button 
+                                  onClick={() => handleExportPRD(selectedPrdVersion)}
+                                  className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg"
+                                >
+                                  下载此版本 PRD
+                                </button>
+                              </>
+                            ) : (
+                              <button 
+                                onClick={savePrdEdit}
+                                className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg flex items-center gap-2"
+                              >
+                                <CheckCircle size={18} /> 保存修正
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-6">
+                          <section>
+                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">版本概述</h5>
+                            {isEditingPrd ? (
+                              <textarea 
+                                value={selectedPrdVersion.overview}
+                                onChange={(e) => setSelectedPrdVersion({...selectedPrdVersion, overview: e.target.value})}
+                                className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-medium outline-none focus:ring-4 focus:ring-indigo-500/10 h-24"
+                              />
+                            ) : (
+                              <p className="text-sm text-slate-700 font-medium leading-relaxed">{selectedPrdVersion.overview}</p>
+                            )}
+                          </section>
+
+                          <section>
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">变更明细 (自动化识别)</h5>
+                              {isEditingPrd && (
+                                <button 
+                                  onClick={() => setSelectedPrdVersion({
+                                    ...selectedPrdVersion, 
+                                    changes: [...selectedPrdVersion.changes, { id: `c-${Date.now()}`, module: '新模块', type: '新增', description: '' }]
+                                  })}
+                                  className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1"
+                                >
+                                  <PlusCircle size={12} /> 添加变更
+                                </button>
+                              )}
+                            </div>
+                            <div className="space-y-3">
+                              {selectedPrdVersion.changes.map((change, idx) => (
+                                <div key={change.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-start gap-4">
+                                  {isEditingPrd ? (
+                                    <div className="flex-1 grid grid-cols-3 gap-4">
+                                      <input 
+                                        value={change.module}
+                                        onChange={(e) => {
+                                          const newChanges = [...selectedPrdVersion.changes];
+                                          newChanges[idx].module = e.target.value;
+                                          setSelectedPrdVersion({...selectedPrdVersion, changes: newChanges});
+                                        }}
+                                        className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-xs font-bold"
+                                      />
+                                      <select 
+                                        value={change.type}
+                                        onChange={(e) => {
+                                          const newChanges = [...selectedPrdVersion.changes];
+                                          newChanges[idx].type = e.target.value as any;
+                                          setSelectedPrdVersion({...selectedPrdVersion, changes: newChanges});
+                                        }}
+                                        className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-xs font-bold"
+                                      >
+                                        <option value="新增">新增</option>
+                                        <option value="优化">优化</option>
+                                        <option value="修复">修复</option>
+                                        <option value="重构">重构</option>
+                                      </select>
+                                      <input 
+                                        value={change.description}
+                                        onChange={(e) => {
+                                          const newChanges = [...selectedPrdVersion.changes];
+                                          newChanges[idx].description = e.target.value;
+                                          setSelectedPrdVersion({...selectedPrdVersion, changes: newChanges});
+                                        }}
+                                        className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 text-xs font-bold"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
+                                        change.type === '新增' ? 'bg-emerald-50 text-emerald-600' :
+                                        change.type === '优化' ? 'bg-blue-50 text-blue-600' :
+                                        change.type === '重构' ? 'bg-indigo-50 text-indigo-600' :
+                                        'bg-rose-50 text-rose-600'
+                                      }`}>
+                                        {change.type}
+                                      </span>
+                                      <div className="flex-1">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">[{change.module}]</span>
+                                        <span className="text-xs text-slate-700 font-medium">{change.description}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                  {isEditingPrd && (
+                                    <button 
+                                      onClick={() => {
+                                        const newChanges = selectedPrdVersion.changes.filter((_, i) => i !== idx);
+                                        setSelectedPrdVersion({...selectedPrdVersion, changes: newChanges});
+                                      }}
+                                      className="text-slate-300 hover:text-rose-500"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4 border-2 border-dashed border-slate-100 rounded-[2rem]">
+                        <History size={48} className="opacity-20" />
+                        <p className="text-sm font-black uppercase tracking-widest italic">请从左侧选择一个版本查看详情</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+             </div>
+
+             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-50">
+                  <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+                    <Database size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">数据全量清理与重置</h3>
+                    <p className="text-xs text-slate-400 font-bold mt-1">危险操作：重置所有系统字典、目标数据及 PRD 历史。</p>
+                  </div>
+                </div>
+                <div className="p-8 bg-rose-50/30 border border-rose-100 rounded-[2rem] flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <AlertTriangle className="text-rose-500" size={32} />
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">全量数据清理</h4>
+                      <p className="text-xs text-slate-500 font-medium">此操作不可撤销，将清除所有已录入的业务数据。</p>
+                    </div>
+                  </div>
+                  <button className="px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-rose-700 shadow-lg shadow-rose-100 opacity-50 cursor-not-allowed">
+                    暂不可用 (需超级管理员权限)
+                  </button>
+                </div>
+             </div>
           </div>
         )}
       </div>

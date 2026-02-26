@@ -139,3 +139,21 @@ export interface Team {
   membersCount: number;
   bu: string;
 }
+
+export interface PRDChange {
+  id: string;
+  module: string;
+  description: string;
+  type: '新增' | '优化' | '修复' | '重构';
+}
+
+export interface PRDVersion {
+  id: string;
+  version: string;
+  releaseDate: string;
+  title: string;
+  overview: string;
+  changes: PRDChange[];
+  fullContent: string; // HTML content for export
+  isDraft?: boolean;
+}
