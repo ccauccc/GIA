@@ -273,6 +273,75 @@ export const generateDailySummary = async (content: string): Promise<string> => 
 /**
  * Performs a deep risk assessment for a specific goal.
  */
+
+/**
+ * Generates a PRD update summary based on daily reports.
+ */
+export const generatePrdUpdateFromReports = async (reports: any[]): Promise<{
+  title: string;
+  overview: string;
+  changes: { module: string; type: '新增' | '优化' | '修复' | '重构'; description: string }[];
+  fullContent: string;
+}> => {
+  const prompt = `
+    作为产品经理助手，请根据以下团队日报内容，自动生成今日的产品需求文档（PRD）更新摘要。
+    
+    日报内容：
+    ${JSON.stringify(reports.flatMap(r => r.segments.map((s: any) => s.content)))}
+    
+    请识别出其中涉及的功能变更、优化或修复，并生成一个结构化的更新记录。
+    
+    请返回 JSON 格式：
+    - title: 版本更新标题 (例如 "GIA V1.x 每日构建")
+    - overview: 版本概述 (简要总结今日主要变更点)
+    - changes: 变更列表，包含 module (模块名), type (新增/优化/修复/重构), description (变更描述)
+    - fullContent: 详细的功能说明 HTML 片段 (使用 h3, p, ul 等标签)
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            overview: { type: Type.STRING },
+            changes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  module: { type: Type.STRING },
+                  type: { type: Type.STRING, enum: ['新增', '优化', '修复', '重构'] },
+                  description: { type: Type.STRING }
+                },
+                required: ['module', 'type', 'description']
+              }
+            },
+            fullContent: { type: Type.STRING }
+          },
+          required: ['title', 'overview', 'changes', 'fullContent']
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error('Failed to generate PRD update:', error);
+    return {
+      title: `GIA V1.${new Date().getDate()} 自动更新失败`,
+      overview: 'AI 生成失败，请手动检查日报。',
+      changes: [],
+      fullContent: '<p>生成失败。</p>'
+    };
+  }
+};
+
+/**
+ * Performs a deep risk assessment for a specific goal.
+ */
 export const analyzeGoalRisk = async (goal: Goal): Promise<{
   riskAssessment: string;
   suggestedMeasures: string[];

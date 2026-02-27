@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { GoalCategory, Team, PRDVersion, PRDChange } from '../types';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { MOCK_PRD_VERSIONS } from '../constants';
+import { MOCK_PRD_VERSIONS, MOCK_REPORTS } from '../constants';
 import { FULL_SYSTEM_PRD_HTML } from '../prdConstants';
-import { History, FileEdit, PlusCircle, CheckCircle } from 'lucide-react';
+import { History, FileEdit, PlusCircle, CheckCircle, Clock } from 'lucide-react';
+import { generatePrdUpdateFromReports } from '../services/geminiService';
 
 interface SystemSettingsProps {
   buOptions: string[];
@@ -32,6 +33,35 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
   const [prdVersions, setPrdVersions] = useState<PRDVersion[]>(MOCK_PRD_VERSIONS);
   const [selectedPrdVersion, setSelectedPrdVersion] = useState<PRDVersion | null>(null);
   const [isEditingPrd, setIsEditingPrd] = useState(false);
+  
+  // Auto Update State
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false);
+  const [autoUpdateTime, setAutoUpdateTime] = useState("21:00");
+  const [isGeneratingPrd, setIsGeneratingPrd] = useState(false);
+
+  // Timer for auto-update
+  React.useEffect(() => {
+    if (!autoUpdateEnabled) return;
+
+    const checkTime = () => {
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      // Check if current time matches set time (and we haven't already updated today - simple check)
+      // For demo purposes, we just check the minute match. In production, we'd need a "lastUpdated" flag.
+      if (currentTime === autoUpdateTime && !isGeneratingPrd) {
+        const todayStr = now.toISOString().split('T')[0];
+        const alreadyUpdatedToday = prdVersions.some(v => v.releaseDate === todayStr && v.title.includes('自动更新'));
+        
+        if (!alreadyUpdatedToday) {
+          handleAutomatePrdUpdate();
+        }
+      }
+    };
+
+    const timer = setInterval(checkTime, 60000); // Check every minute
+    return () => clearInterval(timer);
+  }, [autoUpdateEnabled, autoUpdateTime, prdVersions, isGeneratingPrd]);
 
   const handleExportPRD = (versionObj?: PRDVersion) => {
     const v = versionObj || prdVersions[0];
@@ -156,25 +186,36 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const handleAutomatePrdUpdate = () => {
-    // Simulate automated PRD generation based on "system changes"
-    const nextVersion = `V1.${prdVersions.length + 5}`;
+  const handleAutomatePrdUpdate = async () => {
+    setIsGeneratingPrd(true);
+    
+    // Use real AI service to generate update based on MOCK_REPORTS
+    // In a real app, this would fetch today's reports from backend
+    const todayReports = MOCK_REPORTS; // Using all mock reports for demo richness
+    
+    const updateData = await generatePrdUpdateFromReports(todayReports);
+    
+    const nextVersionNum = prdVersions.length + 1;
+    const nextVersion = `V1.${Math.floor(nextVersionNum / 10)}.${nextVersionNum % 10}`;
+    
     const newVersion: PRDVersion = {
-      id: `v${nextVersion.toLowerCase()}`,
+      id: `v${Date.now()}`,
       version: nextVersion,
       releaseDate: new Date().toISOString().split('T')[0],
-      title: `GIA ${nextVersion} 自动化生成版本`,
-      overview: '系统检测到多项功能变更，已自动汇总至此版本。',
-      changes: [
-        { id: `c-${Date.now()}-1`, module: '系统管理', type: '新增', description: 'PRD 自动化书写与版本管理功能重构。' },
-        { id: `c-${Date.now()}-2`, module: '支撑看板', type: '优化', description: '增强了 Timeline 数据的自动化截取精度。' }
-      ],
-      fullContent: '<h3>功能重构说明</h3><p>本次版本重点解决了 PRD 手动维护成本高的问题，通过版本化管理实现变更可追溯。</p>',
+      title: updateData.title || `GIA ${nextVersion} 自动化构建`,
+      overview: updateData.overview || '系统自动生成的每日构建版本。',
+      changes: updateData.changes.map((c, idx) => ({
+        id: `c-${Date.now()}-${idx}`,
+        ...c
+      })),
+      fullContent: updateData.fullContent || '<p>暂无详细说明。</p>',
       isDraft: true
     };
+
     setPrdVersions([newVersion, ...prdVersions]);
     setSelectedPrdVersion(newVersion);
     setIsEditingPrd(true);
+    setIsGeneratingPrd(false);
   };
 
   const savePrdEdit = () => {
@@ -1059,6 +1100,24 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 mr-4 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                      <Clock size={14} className={autoUpdateEnabled ? "text-indigo-500" : "text-slate-300"} />
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">每日定时更新:</span>
+                      <input 
+                        type="time" 
+                        value={autoUpdateTime}
+                        onChange={(e) => setAutoUpdateTime(e.target.value)}
+                        disabled={!autoUpdateEnabled}
+                        className="bg-transparent text-xs font-black outline-none w-16 text-center disabled:text-slate-300"
+                      />
+                      <button 
+                        onClick={() => setAutoUpdateEnabled(!autoUpdateEnabled)}
+                        className={`w-8 h-4 rounded-full transition-colors relative ${autoUpdateEnabled ? 'bg-indigo-500' : 'bg-slate-200'}`}
+                      >
+                        <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${autoUpdateEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+
                     <button 
                       onClick={handleExportFullPRD}
                       className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all flex items-center gap-2"
@@ -1067,9 +1126,11 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
                     </button>
                     <button 
                       onClick={handleAutomatePrdUpdate}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
+                      disabled={isGeneratingPrd}
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 disabled:opacity-70"
                     >
-                      <Zap size={18} /> 自动化生成新版本
+                      {isGeneratingPrd ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" /> : <Zap size={18} />}
+                      {isGeneratingPrd ? '生成中...' : '立即生成新版本'}
                     </button>
                   </div>
                 </div>
